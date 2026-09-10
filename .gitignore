@@ -1,0 +1,30 @@
+# Dependencias
+node_modules/
+
+# Variables de entorno — se ignora todo .env* salvo la plantilla
+.env*
+!.env.example
+*.bak
+*.backup
+*~
+
+# Base de datos local (fase 2)
+*.sqlite
+*.sqlite3
+*.db
+data/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Sistema operativo / editores
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Build / coverage
+dist/
+coverage/

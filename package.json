@@ -1,0 +1,28 @@
+{
+  "name": "project4-estudio-lumen",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Landing page para Estudio Lumen — estudio de diseño de interiores (pieza de portafolio)",
+  "type": "module",
+  "main": "server.js",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": [
+    "landing",
+    "express",
+    "portfolio"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.7.0",
+    "nodemailer": "^10.0.2"
+  }
+}

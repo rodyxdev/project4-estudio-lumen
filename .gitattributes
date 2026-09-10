@@ -1,0 +1,25 @@
+# Normalizar saltos de línea: el repo guarda siempre LF
+* text=auto eol=lf
+
+# Forzar LF explícitamente en scripts y fuentes
+*.sh   text eol=lf
+*.js   text eol=lf
+*.mjs  text eol=lf
+*.cjs  text eol=lf
+*.json text eol=lf
+*.html text eol=lf
+*.css  text eol=lf
+*.md   text eol=lf
+
+# Los .bat/.cmd de Windows necesitan CRLF
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+
+# Binarios: sin normalización
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.webp binary
+*.ico  binary
+*.woff binary
+*.woff2 binary
