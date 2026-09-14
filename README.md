@@ -2,7 +2,7 @@
 
 Landing page con backend funcional para un estudio de diseño de interiores ficticio. Pieza de portafolio.
 
-**Demo en vivo:** `[pendiente de despliegue]`
+**Demo en vivo:** https://project4-estudio-lumen.vercel.app
 
 ---
 
