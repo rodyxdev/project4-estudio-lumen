@@ -17,6 +17,25 @@ const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 export function createApp() {
   const app = express();
 
+  // No anunciar el framework: es información gratis para quien busca exploits
+  // conocidos de una versión concreta.
+  app.disable('x-powered-by');
+
+  // Cabeceras de seguridad básicas. Tres líneas en vez de traerse helmet
+  // entero para esto:
+  //   nosniff        — impide que el navegador adivine el tipo de contenido
+  //                    y ejecute como script algo que servimos como JSON.
+  //   DENY           — nadie puede meter el sitio en un iframe (clickjacking).
+  //   Referrer-Policy — no filtrar la URL completa a terceros al salir del sitio.
+  // Ojo: esto solo cubre lo que pasa por la función. Los estáticos los sirve
+  // el CDN de Vercel sin tocar Express, y sus cabeceras van en vercel.json.
+  app.use((req, res, next) => {
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.set('X-Frame-Options', 'DENY');
+    res.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+    next();
+  });
+
   // Vercel (y cualquier PaaS) sirve la app detrás de su propio edge: la IP que
   // ve Express es la del proxy, no la del visitante, y llega la real en
   // X-Forwarded-For. Sin esto, el rate limiting mete a todos los visitantes en

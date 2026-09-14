@@ -40,11 +40,27 @@ export const BUDGET_RANGES = Object.freeze([
   'por-definir',
 ]);
 
+/* Caracteres de control C0 (mas DEL), excepto tab, LF y CR, que si son
+   legitimos dentro de un textarea. Se eliminan siempre: Postgres rechaza el
+   byte nulo en columnas `text`, y sin ese filtro un byte nulo en cualquier
+   campo hacia fallar el INSERT y devolvia un 500 por basura del cliente. */
+const CONTROL_CHARS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
+
 /** Convierte cualquier entrada en string recortado ('' si no es texto usable). */
 function str(value) {
-  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'string') return value.replace(CONTROL_CHARS, '').trim();
   if (typeof value === 'number' && Number.isFinite(value)) return String(value);
   return '';
+}
+
+/* Campos de una sola línea: un salto de línea ahí no aporta nada y es la forma
+   clásica de intentar inyectar cabeceras en el correo de notificación.
+   Nodemailer ya lo neutraliza por su cuenta; esto es defensa en profundidad. */
+function oneLine(value) {
+  return str(value)
+    .replace(/[\r\n]+/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
 }
 
 function checkRequired(errors, field, value, label, max) {
@@ -100,8 +116,8 @@ function checkEnum(errors, field, value, label, allowed) {
 /** POST /api/contacto — name, email, message. */
 export function validateContacto(body = {}) {
   const errors = {};
-  const name = str(body.name);
-  const email = str(body.email).toLowerCase();
+  const name = oneLine(body.name);
+  const email = oneLine(body.email).toLowerCase();
   const message = str(body.message);
 
   checkRequired(errors, 'name', name, 'El nombre', LIMITS.name);
@@ -118,11 +134,11 @@ export function validateContacto(body = {}) {
 /** POST /api/cotizacion — name, email, project_type, budget_range, message (phone opcional). */
 export function validateCotizacion(body = {}) {
   const errors = {};
-  const name = str(body.name);
-  const email = str(body.email).toLowerCase();
-  const phone = str(body.phone);
-  const projectType = str(body.project_type);
-  const budgetRange = str(body.budget_range);
+  const name = oneLine(body.name);
+  const email = oneLine(body.email).toLowerCase();
+  const phone = oneLine(body.phone);
+  const projectType = oneLine(body.project_type);
+  const budgetRange = oneLine(body.budget_range);
   const message = str(body.message);
 
   checkRequired(errors, 'name', name, 'El nombre', LIMITS.name);
@@ -150,7 +166,7 @@ export function validateCotizacion(body = {}) {
 /** POST /api/newsletter — solo email. */
 export function validateNewsletter(body = {}) {
   const errors = {};
-  const email = str(body.email).toLowerCase();
+  const email = oneLine(body.email).toLowerCase();
   checkEmail(errors, email);
 
   return {
