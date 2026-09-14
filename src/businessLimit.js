@@ -3,70 +3,66 @@
 
    Se consume MANUALMENTE dentro del handler, después de que la validación
    pasó y justo antes del insert. Esa colocación es el punto entero de esta
-   capa: equivocarse rellenando un formulario devuelve 400 y NO gasta cuota;
-   solo cuenta lo que de verdad iba a convertirse en una fila.
+   capa y NO cambia con la migración: equivocarse rellenando un formulario
+   devuelve 400 y no gasta cuota; solo cuenta lo que de verdad iba a
+   convertirse en una fila.
 
-   Ventana deslizante en memoria por (endpoint + IP). Al ser en memoria,
-   el contador se reinicia si se reinicia el proceso y no se comparte entre
-   instancias — suficiente para un solo servidor, no para varios.
+   El contador vive en Postgres (RPC increment_rate_limit), ventana de una hora.
+
+   FAIL-OPEN: si la RPC falla se deja pasar el envío y se registra como
+   ADVERTENCIA. Aquí el riesgo es menor que en la capa 1 (el envío ya pasó
+   validación y honeypot, y la capa 1 sigue delante), pero significa que
+   durante la incidencia alguien podría superar los 3/hora.
    ========================================================= */
+import { incrementRateLimit, truncateToHour, isSupabaseConfigured } from './supabase.js';
 
-const WINDOW_MS = Number(process.env.BUSINESS_LIMIT_WINDOW_MS) || 60 * 60 * 1000; // 1 hora
 const MAX = Number(process.env.BUSINESS_LIMIT_MAX) || 3;
 
-/** @type {Map<string, number[]>} clave → timestamps de los envíos válidos */
-const hits = new Map();
-
-function prune(timestamps, cutoff) {
-  return timestamps.filter((t) => t > cutoff);
+/** Igual que en la capa 1: la IP forma parte del bucket, si no sería global. */
+function bucketDe(endpoint, ip) {
+  return `business:${endpoint}:${ip}`;
 }
 
 /**
  * Intenta consumir una unidad de cuota.
  * @param {string} endpoint  p.ej. 'cotizacion'
  * @param {string} ip
- * @returns {{ allowed: boolean, remaining: number, retryAfterSeconds: number }}
+ * @returns {Promise<{ allowed: boolean, remaining: number, retryAfterSeconds: number }>}
  */
-export function consumeBusinessLimit(endpoint, ip) {
-  const key = `${endpoint}:${ip}`;
-  const now = Date.now();
-  const cutoff = now - WINDOW_MS;
+export async function consumeBusinessLimit(endpoint, ip) {
+  if (!isSupabaseConfigured()) {
+    console.warn(
+      `[business-limit] FAIL-OPEN — Supabase sin configurar, no se aplica cuota a ${endpoint}.`
+    );
+    return { allowed: true, remaining: MAX, retryAfterSeconds: 0 };
+  }
 
-  const timestamps = prune(hits.get(key) || [], cutoff);
+  const inicioVentana = truncateToHour();
 
-  if (timestamps.length >= MAX) {
-    hits.set(key, timestamps);
-    const retryAfterSeconds = Math.max(1, Math.ceil((timestamps[0] + WINDOW_MS - now) / 1000));
+  let hits;
+  try {
+    hits = await incrementRateLimit({
+      bucket: bucketDe(endpoint, ip),
+      windowStart: inicioVentana,
+      limit: MAX,
+    });
+  } catch (err) {
+    console.warn(
+      `[business-limit] FAIL-OPEN — no se pudo contabilizar el envío de ${ip} en ${endpoint}. ` +
+        `Se acepta sin aplicar la cuota de ${MAX}/hora.\n` +
+        `                 ${err.message}`
+    );
+    return { allowed: true, remaining: MAX, retryAfterSeconds: 0 };
+  }
+
+  if (hits > MAX) {
+    // Segundos que faltan para que empiece la siguiente ventana horaria.
+    const finVentana = inicioVentana.getTime() + 60 * 60 * 1000;
+    const retryAfterSeconds = Math.max(1, Math.ceil((finVentana - Date.now()) / 1000));
     return { allowed: false, remaining: 0, retryAfterSeconds };
   }
 
-  timestamps.push(now);
-  hits.set(key, timestamps);
-  return { allowed: true, remaining: MAX - timestamps.length, retryAfterSeconds: 0 };
+  return { allowed: true, remaining: Math.max(0, MAX - hits), retryAfterSeconds: 0 };
 }
 
-/** Cuota consumida sin tocarla (para tests y diagnóstico). */
-export function peekBusinessLimit(endpoint, ip) {
-  const timestamps = prune(hits.get(`${endpoint}:${ip}`) || [], Date.now() - WINDOW_MS);
-  return { used: timestamps.length, remaining: Math.max(0, MAX - timestamps.length) };
-}
-
-/** Vacía el contador (tests). */
-export function resetBusinessLimit() {
-  hits.clear();
-}
-
-// Barrido periódico: sin esto el Map crece con una entrada por IP para siempre.
-const sweep = setInterval(() => {
-  const cutoff = Date.now() - WINDOW_MS;
-  for (const [key, timestamps] of hits) {
-    const vivos = prune(timestamps, cutoff);
-    if (vivos.length === 0) hits.delete(key);
-    else hits.set(key, vivos);
-  }
-}, Math.min(WINDOW_MS, 10 * 60 * 1000));
-
-// No debe mantener vivo el proceso.
-if (typeof sweep.unref === 'function') sweep.unref();
-
-export const BUSINESS_LIMIT_CONFIG = { windowMs: WINDOW_MS, max: MAX };
+export const BUSINESS_LIMIT_CONFIG = { windowMs: 60 * 60 * 1000, max: MAX };

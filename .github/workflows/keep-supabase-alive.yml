@@ -1,0 +1,47 @@
+name: Keep Supabase alive
+
+# Los proyectos gratuitos de Supabase se pausan tras 7 días sin actividad.
+# Este workflow hace una lectura trivial cada 3 días para que el proyecto
+# nunca llegue a ese umbral.
+on:
+  schedule:
+    # 12:00 UTC cada 3 días.
+    - cron: '0 12 */3 * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    name: Ping REST de Supabase
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: GET /rest/v1/subscribers
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${SUPABASE_URL}" ] || [ -z "${SUPABASE_SERVICE_ROLE_KEY}" ]; then
+            echo "::error::Faltan los secrets SUPABASE_URL y/o SUPABASE_SERVICE_ROLE_KEY en el repositorio."
+            exit 1
+          fi
+
+          # -s sin barra de progreso, -o descarta el cuerpo, -w deja solo el código.
+          # La key va en cabeceras, nunca en la URL, para que no acabe en los logs.
+          status=$(curl -s -o /dev/null -w '%{http_code}' \
+            --max-time 30 \
+            --retry 2 --retry-delay 5 \
+            -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            "${SUPABASE_URL}/rest/v1/subscribers?select=id&limit=1")
+
+          echo "HTTP ${status}"
+
+          if [ "${status}" -lt 200 ] || [ "${status}" -ge 300 ]; then
+            echo "::error::El ping a Supabase devolvió HTTP ${status}. El proyecto puede estar pausado o los secrets pueden estar mal."
+            exit 1
+          fi
+
+          echo "Supabase respondió correctamente; el proyecto sigue activo."

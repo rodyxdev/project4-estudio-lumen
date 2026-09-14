@@ -1,6 +1,6 @@
 import express from 'express';
 import { validateNewsletter } from '../validation.js';
-import { subscribeEmail } from '../db.js';
+import { subscribeEmail } from '../subscribers.js';
 import { consumeBusinessLimit } from '../businessLimit.js';
 import { isHoneypotTriggered, logHoneypot } from '../honeypot.js';
 
@@ -17,7 +17,7 @@ const EXITO_BODY = {
 };
 
 // POST /api/newsletter
-router.post('/', (req, res, next) => {
+router.post('/', async (req, res, next) => {
   // 1. Señuelo.
   if (isHoneypotTriggered(req.body)) {
     logHoneypot(req, ENDPOINT);
@@ -36,7 +36,7 @@ router.post('/', (req, res, next) => {
   }
 
   // 3. Capa 2.
-  const cuota = consumeBusinessLimit(ENDPOINT, req.ip);
+  const cuota = await consumeBusinessLimit(ENDPOINT, req.ip);
   if (!cuota.allowed) {
     console.warn(`[business-limit] ${req.ip} agotó la cuota de ${ENDPOINT}`);
     res.set('Retry-After', String(cuota.retryAfterSeconds));
@@ -48,7 +48,7 @@ router.post('/', (req, res, next) => {
   }
 
   try {
-    const { id, status } = subscribeEmail(value.email);
+    const { id, status } = await subscribeEmail(value.email);
     // El detalle solo se registra en servidor.
     console.log(`[newsletter] ${value.email} → ${status} (subscriber #${id})`);
     return res.status(EXITO_STATUS).json(EXITO_BODY);
