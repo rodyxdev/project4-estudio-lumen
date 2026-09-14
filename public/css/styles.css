@@ -1026,10 +1026,8 @@ body.nav-open {
   border-color: rgba(179, 38, 30, 0.3);
 }
 
-/* Campo señuelo del antispam. Fuera de la pantalla, no `display:none` ni
-   `type="hidden"`: se trata de que un bot que lee el DOM lo vea como un campo
-   normal y lo rellene. Tamaño 1x1 para que no genere hueco ni scroll. */
-.hp-field {
+/* Contenedor auxiliar fuera de flujo. */
+.field-aux {
   position: absolute;
   left: -9999px;
   top: auto;

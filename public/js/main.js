@@ -3,9 +3,6 @@
    Vanilla, sin dependencias. Los tres formularios envían por fetch()
    a la API de /api/*; la validación nativa del navegador actúa como
    primera capa y el servidor revalida todo por su cuenta.
-
-   Los formularios incluyen un campo señuelo (company_website) oculto por CSS:
-   se reenvía tal cual al backend, que descarta el envío si llega con algo.
    ========================================================= */
 (function () {
   'use strict';
