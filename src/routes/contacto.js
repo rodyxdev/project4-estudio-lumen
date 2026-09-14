@@ -36,7 +36,7 @@ router.post('/', async (req, res, next) => {
   }
 
   // 3. Capa 2: solo llegan aquí los envíos con formato correcto.
-  const cuota = consumeBusinessLimit(ENDPOINT, req.ip);
+  const cuota = await consumeBusinessLimit(ENDPOINT, req.ip);
   if (!cuota.allowed) {
     console.warn(`[business-limit] ${req.ip} agotó la cuota de ${ENDPOINT}`);
     res.set('Retry-After', String(cuota.retryAfterSeconds));

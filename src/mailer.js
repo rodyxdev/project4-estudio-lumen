@@ -2,7 +2,7 @@
    Correo — Nodemailer contra Mailtrap sandbox.
 
    Regla de la fase 2: el correo es best-effort. La fuente de verdad es el
-   INSERT en SQLite; si el envío falla, se registra el error y la petición
+   INSERT en Supabase; si el envío falla, se registra el error y la petición
    del usuario sigue siendo un éxito. Por eso nada de aquí debe lanzar
    hacia el handler de la ruta sin que este lo capture.
    ========================================================= */

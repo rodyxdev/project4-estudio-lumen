@@ -11,8 +11,9 @@ Landing page con backend funcional para un estudio de diseño de interiores fict
 | Capa | Tecnología |
 |---|---|
 | Servidor | Node.js + Express 5 |
-| Base de datos | SQLite (`better-sqlite3`) |
+| Base de datos | Supabase (PostgreSQL) |
 | Correo | Nodemailer (Mailtrap sandbox en desarrollo) |
+| Hosting | Vercel (función serverless + estáticos) |
 | Frontend | HTML, CSS y JavaScript sin frameworks |
 
 Sin framework de frontend y sin framework de CSS: la landing es una sola página estática, y meter
@@ -21,7 +22,7 @@ una capa de build para eso habría añadido peso y mantenimiento sin resolver ni
 ## Qué hace
 
 - **Tres formularios funcionales** — cotización, newsletter y contacto general. Envían por `fetch`
-  a una API JSON y persisten en SQLite.
+  a una API JSON y persisten en Postgres.
 - **Validación server-side** — manual, sin librerías: formato de email, campos obligatorios que no
   admiten solo espacios, límites de longitud, y whitelist cerrada para los dos desplegables de
   cotización. El navegador valida primero como cortesía de UX; el servidor no se fía de eso.
@@ -37,11 +38,10 @@ una capa de build para eso habría añadido peso y mantenimiento sin resolver ni
 
 ## Decisiones de arquitectura
 
-**SQLite en lugar de PostgreSQL.** El volumen esperado son unas pocas consultas al día desde un
-formulario de contacto, y todas las escrituras vienen de un único proceso. Postgres habría añadido
-un servicio que administrar, credenciales que rotar y un coste mensual, a cambio de concurrencia que
-este alcance no necesita. `better-sqlite3` es síncrono, lo que además elimina toda una clase de
-errores de concurrencia en el código de rutas.
+**Supabase Postgres en lugar de una base local.** El proyecto corre en Vercel como función
+serverless: no hay disco propio ni proceso de larga vida, así que un archivo SQLite se perdería en
+cada invocación. Supabase aporta un Postgres gestionado con API REST, lo que encaja con el modelo
+sin estado sin necesidad de administrar un servidor de base de datos.
 
 **Dos capas de rate limiting en vez de una.** Un único límite obliga a elegir entre ser laxo con los
 bots o castigar a un usuario legítimo que se equivoca tres veces rellenando el formulario. Separarlas
@@ -50,12 +50,23 @@ válido o no, para frenar el ruido automatizado; la capa 2 (3 envíos/hora por I
 consume dentro del handler, después de validar y antes de insertar, así que **un error de validación
 devuelve 400 y no gasta cuota**. Equivocarse rellenando un formulario no cuesta nada; abusar, sí.
 
-**Almacenamiento efímero en el plan gratuito de Render.** El disco del plan free no persiste entre
-despliegues ni reinicios: cada vez que el servicio se reconstruye, el archivo SQLite se pierde y se
-recrea vacío en el primer arranque. Para una pieza de portafolio es aceptable — la notificación por
-correo llega igual y es lo que de verdad importa del formulario — pero **no es apto para producción
-real** tal cual. Un cliente real necesitaría un disco persistente de pago o migrar a Postgres, y esa
-migración toca únicamente `src/db.js`.
+**Los contadores viven en Postgres, no en memoria.** En serverless cada petición puede caer en una
+instancia distinta, así que un contador en memoria no contaría nada útil. Ambas capas llaman a una
+función `increment_rate_limit` que incrementa de forma atómica en la tabla `rate_limit_hits`. Si esa
+llamada falla, las dos capas **dejan pasar la petición** (*fail-open*) y lo registran: preferimos
+aceptar spam durante una caída de infraestructura antes que tirar el formulario para todos.
+
+## Limitaciones conocidas
+
+- **Los proyectos gratuitos de Supabase se pausan tras 7 días de inactividad** y hay que reactivarlos
+  a mano desde el dashboard. Si eso pasa, la landing carga con normalidad (es estática) pero los
+  formularios fallan al intentar guardar.
+- **Existe un keep-alive automático** para evitarlo: el workflow
+  [`.github/workflows/keep-supabase-alive.yml`](.github/workflows/keep-supabase-alive.yml) hace una
+  lectura trivial contra la API REST de Supabase **cada 3 días**, y también puede lanzarse a mano
+  desde la pestaña *Actions*. Si aun así el proyecto llegara a pausarse, lo primero que hay que
+  mirar es esa pestaña: el step falla con el código HTTP recibido, así que un ping roto aparece como
+  un run en rojo en lugar de fallar en silencio.
 
 ## Setup local
 
@@ -69,10 +80,11 @@ npm start
 
 La app queda en `http://localhost:3000`. Health check en `/health`.
 
-Para desarrollo con recarga automática: `npm run dev`.
+Para desarrollo con recarga automática: `npm run dev`. En local se usa `server.js`, que levanta el
+mismo Express que la función de Vercel y apunta al mismo Supabase.
 
-La base de datos se crea sola en el primer arranque, en la ruta que indique `DB_PATH`. No hay que
-ejecutar migraciones.
+El esquema (`inquiries`, `subscribers`, `rate_limit_hits` y la función `increment_rate_limit`) vive
+en Supabase y se crea desde su SQL Editor; el proyecto no ejecuta migraciones al arrancar.
 
 Para el correo en desarrollo, [Mailtrap](https://mailtrap.io) sandbox: captura todo lo que se envía
 sin entregarlo a nadie. Si no configuras SMTP, la app arranca igual y avisa por consola de que las
@@ -82,35 +94,44 @@ notificaciones quedan desactivadas — los formularios se siguen guardando.
 
 | Variable | Descripción |
 |---|---|
-| `PORT` | Puerto del servidor. En local, 3000. En Render no hace falta definirlo: la plataforma inyecta el suyo y la app lo respeta. |
-| `TRUST_PROXY` | `1` únicamente detrás de un proxy inverso (Render). Ausente o vacío en local. Sin esto en producción, el rate limiting ve la IP del proxy en todas las peticiones y trata a todos los visitantes como uno solo. Activarlo sin un proxy real delante permite falsificar la IP con una cabecera. |
+| `PORT` | Puerto del servidor en desarrollo local. No aplica en Vercel. |
+| `TRUST_PROXY` | `1` únicamente detrás de un proxy inverso (Vercel). Ausente o vacío en local. Sin esto en producción, el rate limiting ve la IP del edge en todas las peticiones y trata a todos los visitantes como uno solo. Activarlo sin un proxy real delante permite falsificar la IP con una cabecera. |
+| `SUPABASE_URL` | URL del proyecto Supabase (`https://xxxx.supabase.co`). |
+| `SUPABASE_SERVICE_ROLE_KEY` | Clave `service_role`, **no** la `anon`. Salta RLS y da acceso total: es server-only, nunca debe llegar al cliente, aparecer en un log ni commitearse. |
 | `SMTP_HOST` | Host del servidor SMTP. |
 | `SMTP_PORT` | Puerto SMTP (2525 o 587 en Mailtrap sandbox). |
 | `SMTP_USER` | Usuario SMTP. |
 | `SMTP_PASS` | Contraseña SMTP. |
 | `MAIL_FROM` | Remitente de las notificaciones internas. |
 | `ADMIN_NOTIFY_EMAIL` | Dirección que recibe el aviso de cada consulta. |
-| `DB_PATH` | Ruta del archivo SQLite, relativa a la raíz del proyecto. El directorio se crea solo. |
 
 Ninguna de estas debe acabar en el repositorio: `.env` está en `.gitignore`, y solo se versiona
 `.env.example` con valores de ejemplo.
 
 ## Despliegue
 
-El repositorio incluye `render.yaml` como blueprint de [Render](https://render.com). Todas las
-variables sensibles van marcadas con `sync: false`, de modo que Render las pide en el dashboard en
-lugar de leerlas del archivo versionado.
+Vercel detecta el proyecto sin configuración extra. `vercel.json` reescribe `/api/*` y `/health`
+hacia la función de `api/index.js`, y deja que el contenido de `public/` se sirva como estático sin
+pasar por la función.
 
-Recuerda poner `TRUST_PROXY=1` entre las variables del servicio.
+Hay que declarar en las *Environment Variables* del proyecto de Vercel todas las variables de la
+tabla de arriba excepto `PORT`, y **`TRUST_PROXY` debe valer `1`**.
+
+El keep-alive de Supabase necesita además dos secrets en el repositorio de GitHub
+(*Settings → Secrets and variables → Actions*): `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY`, con los
+mismos valores del `.env` local.
 
 ## Estructura
 
 ```
-├── server.js              # arranque, apagado limpio
-├── render.yaml            # blueprint de despliegue
+├── server.js              # arranque local
+├── vercel.json            # rewrites y estáticos
+├── api/
+│   └── index.js           # punto de entrada serverless (exporta la app de Express)
 ├── src/
 │   ├── app.js             # configuración de Express (separada para poder testear)
-│   ├── db.js              # SQLite: esquema y consultas
+│   ├── supabase.js        # cliente server-only y RPC de rate limiting
+│   ├── subscribers.js     # alta idempotente del boletín
 │   ├── validation.js      # validación manual y whitelists
 │   ├── mailer.js          # Nodemailer
 │   ├── inquiryService.js  # guardar primero, notificar después
@@ -118,7 +139,8 @@ Recuerda poner `TRUST_PROXY=1` entre las variables del servicio.
 │   ├── businessLimit.js   # capa 2 — límite de negocio
 │   ├── honeypot.js        # campo señuelo
 │   └── routes/            # contacto, cotizacion, newsletter
-└── public/                # landing estática
+├── public/                # landing estática
+└── .github/workflows/     # keep-alive de Supabase
 ```
 
 ## Screenshots

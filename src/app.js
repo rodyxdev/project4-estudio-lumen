@@ -17,14 +17,14 @@ const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 export function createApp() {
   const app = express();
 
-  // Render (y cualquier PaaS) sirve la app detrás de su propio proxy: la IP que
+  // Vercel (y cualquier PaaS) sirve la app detrás de su propio edge: la IP que
   // ve Express es la del proxy, no la del visitante, y llega la real en
-  // X-Forwarded-For. Sin esto, express-rate-limit mete a todos los visitantes en
+  // X-Forwarded-For. Sin esto, el rate limiting mete a todos los visitantes en
   // el mismo cubo y el límite de 20/min se agota entre todos: el primer bot deja
   // fuera al resto del mundo.
   //
   // Se activa solo con TRUST_PROXY=1 y con valor 1 (confiar en UN salto, el de
-  // Render). Nunca incondicionalmente: en local no hay proxy delante, así que
+  // Vercel). Nunca incondicionalmente: en local no hay proxy delante, así que
   // confiar en la cabecera dejaría que cualquiera se inventara su IP con un
   // X-Forwarded-For a mano y se saltara ambas capas de límite.
   if (process.env.TRUST_PROXY === '1') {
@@ -96,5 +96,3 @@ export function createApp() {
 
   return app;
 }
-
-export default createApp;

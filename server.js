@@ -1,23 +1,31 @@
+/* =========================================================
+   Servidor para desarrollo local.
+
+   En Vercel no se usa este archivo: allí el punto de entrada es api/index.js,
+   que exporta la misma app de src/app.js como función serverless. Ambos hablan
+   contra el mismo Supabase.
+   ========================================================= */
 import 'dotenv/config';
 import { createApp } from './src/app.js';
-import { getDb, closeDb, resolveDbPath } from './src/db.js';
+import { isSupabaseConfigured } from './src/supabase.js';
 import { isMailEnabled } from './src/mailer.js';
 
 const PORT = Number(process.env.PORT) || 3000;
 
-// Abrir la base antes de escuchar: si el esquema no se puede crear, es mejor
-// no arrancar que aceptar formularios que no se van a poder guardar.
-try {
-  getDb();
-} catch (err) {
-  console.error(`[db] No se pudo abrir la base en ${resolveDbPath()}:`, err.message);
+// Sin Supabase no hay dónde guardar nada: mejor no arrancar que aceptar
+// formularios que se van a perder.
+if (!isSupabaseConfigured()) {
+  console.error(
+    '[supabase] Faltan SUPABASE_URL y/o SUPABASE_SERVICE_ROLE_KEY. ' +
+      'Copia .env.example a .env y rellénalas antes de arrancar.'
+  );
   process.exit(1);
 }
 
 if (!isMailEnabled()) {
   console.warn(
     '[mail] SMTP incompleto: las notificaciones internas quedan desactivadas. ' +
-      'Los formularios se siguen guardando en SQLite.'
+      'Los formularios se siguen guardando en Supabase.'
   );
 }
 
@@ -32,9 +40,6 @@ const server = app.listen(PORT, () => {
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.on(signal, () => {
     console.log(`\n${signal} recibido, cerrando servidor...`);
-    server.close(() => {
-      closeDb();
-      process.exit(0);
-    });
+    server.close(() => process.exit(0));
   });
 }
