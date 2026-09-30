@@ -491,39 +491,6 @@ body.nav-open {
   }
 }
 
-/* ---------- 6. Placeholders de imagen ----------
-   Bloques generados por CSS. En la fase 2 cada uno pasa a ser un <img> real. */
-.ph {
-  --ph-a: #e6d3bf;
-  --ph-b: #b78f6c;
-  position: relative;
-  background-image: radial-gradient(
-      circle at 28% 18%,
-      rgba(255, 255, 255, 0.55),
-      rgba(255, 255, 255, 0) 58%
-    ),
-    linear-gradient(145deg, var(--ph-a) 0%, var(--ph-b) 100%);
-  overflow: hidden;
-}
-
-.ph::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background-image: repeating-linear-gradient(
-    115deg,
-    rgba(255, 255, 255, 0.09) 0 2px,
-    rgba(255, 255, 255, 0) 2px 22px
-  );
-}
-
-.ph--1 { --ph-a: #ecd9c6; --ph-b: #b3805c; }
-.ph--2 { --ph-a: #e3d6c2; --ph-b: #8d8464; }
-.ph--3 { --ph-a: #f0d2c0; --ph-b: #b1604a; }
-.ph--4 { --ph-a: #dfd8ce; --ph-b: #7d766c; }
-.ph--5 { --ph-a: #eddcc9; --ph-b: #9c7f5f; }
-.ph--6 { --ph-a: #e7ddcb; --ph-b: #6f7358; }
-
 /* ---------- 7. Secciones genéricas ---------- */
 .section {
   padding-block: var(--space-section);
@@ -631,6 +598,9 @@ body.nav-open {
 }
 
 .hero__media-frame {
+  width: 100%;
+  height: auto;
+  object-fit: cover;
   aspect-ratio: 4 / 5;
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
@@ -762,6 +732,9 @@ body.nav-open {
 }
 
 .gallery__media {
+  width: 100%;
+  height: auto;
+  object-fit: cover;
   aspect-ratio: 4 / 3;
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
@@ -1192,12 +1165,35 @@ body.nav-open {
   font-style: normal;
 }
 
+/* Crédito de la foto con licencia CC BY-SA: la licencia exige atribución
+   visible, así que va a un tamaño legible, no en el cuerpo más pequeño
+   del aviso legal de abajo. */
+.site-footer__credits {
+  padding-top: 1.5rem;
+  font-size: var(--fs-small);
+  line-height: 1.5;
+  color: #b4a89d;
+}
+
+.site-footer__credits a {
+  color: #b4a89d;
+  text-decoration: underline;
+  text-decoration-color: rgba(180, 168, 157, 0.55);
+  text-underline-offset: 2px;
+}
+
+.site-footer__credits a:hover,
+.site-footer__credits a:focus-visible {
+  color: var(--clay-soft);
+  text-decoration-color: var(--clay-soft);
+}
+
 .site-footer__bottom {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 0.5rem;
-  padding-top: 1.75rem;
+  padding-top: 1rem;
   font-size: var(--fs-eyebrow);
   color: #8b7f75;
 }

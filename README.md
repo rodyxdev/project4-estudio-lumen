@@ -147,6 +147,25 @@ mismos valores del `.env` local.
 
 <!-- agregar capturas tras el despliegue -->
 
+## Créditos
+
+La fotografía de la terraza es obra de terceros y se usa bajo una licencia que **exige
+atribución visible**, por lo que el crédito aparece también en el pie del propio sitio, no solo
+aquí:
+
+> Foto de terraza: «A cozy rooftop table…» por **PattayaPatrol**, vía Wikimedia Commons,
+> [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
+
+CC BY-SA 4.0 es una licencia *share-alike*: si modificas esa imagen y redistribuyes el resultado,
+debes hacerlo bajo la misma licencia y mantener la atribución. En este repositorio la foto se ha
+reescalado y recomprimido para la web; el crédito y el enlace a la licencia se conservan intactos.
+
+El resto de imágenes son material propio del proyecto.
+
+Todas las fotos se sirven optimizadas: reescaladas a un máximo de 1200 px de ancho (1400 el hero)
+y recomprimidas a JPEG progresivo de calidad 85, lo que deja el conjunto en unos 1,1 MB frente a
+los 5,3 MB originales. Ninguna supera los 300 KB.
+
 ## Nota
 
 Estudio Lumen no existe. El nombre, los proyectos, los testimonios y los datos de contacto son
